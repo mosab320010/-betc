@@ -1,13 +1,20 @@
 import pdfMake from 'pdfmake/build/pdfmake';
+
+// The 'pdfmake/build/vfs_fonts.js' file is a UMD module. To use it reliably
+// in an ES module environment without polluting the global scope, we import it
+// and directly assign the virtual file system (VFS) it contains to our pdfMake instance.
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 
-// The UMD build for vfs_fonts.js requires a namespace import (`import * as`) to be handled correctly
-// in a native browser ES module environment. This ensures that the `pdfMake` property containing the
-// virtual file system (vfs) is accessible.
-if ((pdfFonts as any)?.pdfMake?.vfs) {
+// The imported UMD module attaches its exports to a `pdfMake` property.
+// We safely access this and assign the `vfs` object.
+if (pdfFonts && (pdfFonts as any).pdfMake && (pdfFonts as any).pdfMake.vfs) {
   (pdfMake as any).vfs = (pdfFonts as any).pdfMake.vfs;
 } else {
-  console.error("Could not load vfs_fonts. PDF font support will be limited.");
+  console.error("vfs_fonts.js failed to load, so the default Roboto font will be unavailable. PDF font support may be limited.");
+  // Ensure vfs is an object to prevent crashes, even if it's empty.
+  if (!(pdfMake as any).vfs) {
+    (pdfMake as any).vfs = {};
+  }
 }
 
 let cairoFontLoaded = false;
@@ -54,14 +61,7 @@ export async function ensureArabicPdfFont(): Promise<void> {
     };
     cairoFontLoaded = true;
   } catch (error) {
-    console.error("Could not load Arabic font for PDF export:", error);
-    // Fallback to Roboto if Cairo fails to load
-    if (!pdfMake.fonts) {
-        pdfMake.fonts = {};
-    }
-    if (!pdfMake.fonts.Cairo) {
-        pdfMake.fonts.Cairo = pdfMake.fonts.Roboto;
-    }
+    console.error("Could not load Arabic font 'Cairo' for PDF export. The PDF will be generated with the default font, which may not display Arabic characters correctly.", error);
   }
 }
 

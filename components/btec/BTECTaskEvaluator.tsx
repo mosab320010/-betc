@@ -1,5 +1,4 @@
-
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -7,6 +6,7 @@ import { Label } from '../ui/Label';
 import { Textarea } from '../ui/Textarea';
 import { Badge } from '../ui/Badge';
 import type { Criteria, TaskSubmission, EvaluationResult } from '../../types/btec';
+import { useBTECEvaluatorStore } from '../../stores/btecEvaluatorStore';
 import FeedbackPanel from './FeedbackPanel';
 import ChainOfThoughtViewer from './ChainOfThoughtViewer';
 import PredictiveAnalysis from './PredictiveAnalysis';
@@ -20,8 +20,9 @@ const initialCriteria: Criteria[] = [
     { id: 'D1', description: 'تقديم حلول مبتكرة', level: 'D', weight: 40 }
 ];
 
+
 const mockApiCall = async (submission: TaskSubmission): Promise<EvaluationResult> => {
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
 
     const score = Math.min(100, Math.max(0, 60 + Math.round(Math.random() * 35)));
     const isPass = score >= 50;
@@ -31,31 +32,34 @@ const mockApiCall = async (submission: TaskSubmission): Promise<EvaluationResult
       studentName: submission.studentName,
       score,
       isPass,
-      feedback: isPass ? 'أداء جيد مع فرص تحسين في التوثيق وربط الأدلة بالمعايير بشكل أقوى.' : 'نوصي بإعادة صياغة الأقسام الأساسية وإضافة أدلة أكثر قوة لدعم المطالبات الواردة في المهمة.',
+      feedback: isPass ? 'أداء جيد مع فرص تحسين في التوثيق.' : 'نوصي بإعادة صياغة الأقسام الأساسية وإضافة أدلة.',
       plagiarismCheck: { 
         similarityScore: Math.round(Math.random() * 18), 
         sources: ['https://example.com/source-1'], 
         isPlagiarized: false 
       },
       chainOfThought: {
-        taskUnderstanding: ['تحديد نواتج التعلم المطلوبة من دليل الوحدة.', 'مواءمة محتوى المهمة المقدمة مع المعايير P1, M1, D1.'],
-        criteriaAnalysis: Object.fromEntries(submission.criteria.map(c => [c.id, `تم تقييم تحقيق المعيار بناءً على الأدلة المقدمة.`])),
+        taskUnderstanding: ['تحديد نواتج التعلّم', 'مواءمة المهمة مع المعايير'],
+        criteriaAnalysis: Object.fromEntries(submission.criteria.map(c => [c.id, `تحقّق بنسبة ${Math.min(100, Math.round(score * (c.weight / 100)))}%`])),
+        matching: {},
         strengthsWeaknesses: { 
-          strengths: ['تحليل منهجي للمشكلة.', 'بنية واضحة ومنطقية للنص.'], 
-          weaknesses: ['ضعف في الاستشهادات الأكاديمية.', 'الأدلة المقدمة لا تغطي جميع جوانب المعيار D1.'] 
+          strengths: ['تحليل منهجي', 'بنية واضحة'], 
+          weaknesses: ['ضعف في الاستشهادات'] 
         },
-        scoring: Object.fromEntries(submission.criteria.map(c => [c.id, Math.round(score * (Math.random() * 0.5 + 0.75) * (c.weight / 100))]))
+        scoring: Object.fromEntries(submission.criteria.map(c => [c.id, Math.round(score * (c.weight / 100))]))
       },
       predictiveAnalysis: { 
-        confidence: 0.82 + Math.random() * 0.15, 
-        recommendations: ['تعزيز المراجع الأكاديمية.', 'تحسين جودة الأدلة المرئية وربطها بالمعايير.'], 
-        learningPath: ['مراجعة دليل Pearson AAQ 2025.', 'حضور ورشة عمل عن الكتابة الأكاديمية والتوثيق.'] 
+        confidence: 0.82, 
+        recommendations: ['تعزيز المراجع', 'تحسين ربط الأدلة بالمعايير'], 
+        learningPath: ['قراءة دليل Pearson AAQ 2025', 'تدريب على الكتابة الأكاديمية'] 
       },
-      jordanianContextNotes: ['التقييم يتوافق مع متطلبات التقييم الداخلي المعتمدة.', 'العمل المقدم ملائم لإرشادات المدارس الثانوية المهنية في الأردن.'],
+      jordanianContextNotes: ['متوافق مع متطلبات التقييم الداخلي', 'ملائم لإرشادات المدارس في الأردن'],
+      txHash: '',
+      encryptedResult: '',
       timestamp: new Date(),
       version: 'AAQ-2025'
     };
-    
+
     const hashableContent = JSON.stringify({ 
       taskId: partialResult.taskId, 
       studentName: partialResult.studentName, 
@@ -71,9 +75,16 @@ const mockApiCall = async (submission: TaskSubmission): Promise<EvaluationResult
 
 
 export default function BTECTaskEvaluator() {
-  const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const { 
+    evaluationResult, 
+    isLoading, 
+    error, 
+    setSubmission, 
+    startEvaluation, 
+    setEvaluationResult, 
+    setError, 
+    clear 
+  } = useBTECEvaluatorStore();
 
   const [taskId, setTaskId] = useState<number>(1);
   const [studentName, setStudentName] = useState<string>('');
@@ -81,8 +92,7 @@ export default function BTECTaskEvaluator() {
   const [evidenceUrls, setEvidenceUrls] = useState<string>('');
   const [criteria] = useState<Criteria[]>(initialCriteria);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!studentName.trim() || !taskContent.trim()) {
       setError('اسم الطالب ونص المهمة حقول مطلوبة.');
       return;
@@ -96,29 +106,24 @@ export default function BTECTaskEvaluator() {
       criteria
     };
     
-    setIsLoading(true);
-    setError(null);
-    setEvaluationResult(null);
+    setSubmission(submission);
+    startEvaluation();
 
     try {
       const result = await mockApiCall(submission);
       setEvaluationResult(result);
     } catch (err: any) {
       setError(err.message || 'حدث خطأ غير متوقع أثناء التقييم.');
-    } finally {
-      setIsLoading(false);
     }
-  }, [taskId, studentName, taskContent, evidenceUrls, criteria]);
+  };
 
-  const handleReset = useCallback(() => {
-    setEvaluationResult(null);
-    setIsLoading(false);
-    setError(null);
+  const handleReset = () => {
+    clear();
     setTaskId(1);
     setStudentName('');
     setTaskContent('');
     setEvidenceUrls('');
-  }, []);
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -127,7 +132,7 @@ export default function BTECTaskEvaluator() {
           <CardTitle className="text-2xl">مقيّم مهام BTEC</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="taskId">رقم المهمة</Label>
@@ -171,14 +176,14 @@ export default function BTECTaskEvaluator() {
             )}
             
             <div className="flex space-x-2 rtl:space-x-reverse pt-2">
-              <Button type="submit" disabled={isLoading}>
+              <Button onClick={handleSubmit} disabled={isLoading}>
                 {isLoading ? 'جاري التقييم...' : 'قيّم المهمة'}
               </Button>
               <Button type="button" variant="outline" onClick={handleReset}>
                 إعادة تعيين
               </Button>
             </div>
-          </form>
+          </div>
         </CardContent>
       </Card>
       

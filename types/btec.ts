@@ -1,4 +1,3 @@
-
 export type Level = 'P' | 'M' | 'D';
 
 export interface Criteria {
@@ -19,6 +18,7 @@ export interface TaskSubmission {
 export interface ChainOfThoughtStruct {
   taskUnderstanding: string[];
   criteriaAnalysis: Record<string, string>;
+  matching: Record<string, string>;
   strengthsWeaknesses: { 
     strengths: string[]; 
     weaknesses: string[]; 
@@ -44,6 +44,8 @@ export interface EvaluationResult {
     learningPath: string[]; 
   };
   jordanianContextNotes: string[];
+  txHash: string;
+  encryptedResult: string;
   hash: string; // SHA-256 hash
   timestamp: Date;
   version: string; // e.g., 'AAQ-2025'
