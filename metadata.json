@@ -1,0 +1,5 @@
+{
+  "name": "EduVerse Nexus BTEC Evaluator",
+  "description": "An application to evaluate BTEC tasks according to AAQs 2025 updates, featuring detailed feedback, predictive analysis, and PDF export with full Arabic language support.",
+  "requestFramePermissions": []
+}
