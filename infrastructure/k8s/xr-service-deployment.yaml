@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xr-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xr-service
+  template:
+    metadata:
+      labels:
+        app: xr-service
+    spec:
+      containers:
+        - name: xr-service
+          image: eduverse/xr-service:latest
+          ports:
+            - containerPort: 5001
